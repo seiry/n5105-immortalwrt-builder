@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential gawk gettext file rsync unzip wget zstd \
+            build-essential gawk gettext file rsync unzip wget zstd qemu-utils \
             libncurses-dev libssl-dev zlib1g-dev xsltproc python3
 
       - name: Fetch ImageBuilder
