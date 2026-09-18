@@ -36,6 +36,7 @@ build does not reliably fit into. This has no timeout worth worrying about.
 | `keys/*.pem` | Public keys for those feeds, copied into the ImageBuilder. |
 | `files/` | Files copied into the image as-is, rooted at `/`. |
 | `scripts/check-partmap.py` | The partition-table gate. |
+| `scripts/patch-imagebuilder.py` | Fixes an ImageBuilder shell bug and drops the image formats we never flash. It fails loudly once upstream fixes the bug, so read its docstring before deleting it. |
 
 To regenerate the package list from the running router:
 
@@ -69,6 +70,9 @@ sysupgrade /tmp/immortalwrt-*-squashfs-combined-efi.img.gz
 The box reboots into the new image with `/etc` restored from the backup that sysupgrade
 stashes on the boot partition. Check `df -h /opt` afterwards to confirm the Docker
 partition came back, then `/etc/init.d/dockerd start`.
+
+Nothing needs reinstalling: nikki and its feed key ship inside the image, so it is up and
+running on the first boot.
 
 ## If the partition table ever gets rewritten anyway
 
