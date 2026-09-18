@@ -1,0 +1,117 @@
+name: Build image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: ImmortalWrt release version
+        default: "25.12.2"
+      rootfs_partsize:
+        description: Root partition size in MB, must match the router's p2
+        default: "4096"
+      kernel_partsize:
+        description: Boot partition size in MB the image is expected to have (checked, not set)
+        default: "32"
+  schedule:
+    # Weekly rebuild so the image picks up package updates within the release.
+    - cron: "0 20 * * 0"
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION: ${{ inputs.version || '25.12.2' }}
+  ROOTFS_PARTSIZE: ${{ inputs.rootfs_partsize || '4096' }}
+  KERNEL_PARTSIZE: ${{ inputs.kernel_partsize || '32' }}
+  TARGET: x86
+  SUBTARGET: "64"
+  PROFILE: generic
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gawk gettext file rsync unzip wget zstd \
+            libncurses-dev libssl-dev zlib1g-dev xsltproc python3
+
+      - name: Fetch ImageBuilder
+        run: |
+          set -euo pipefail
+          name="immortalwrt-imagebuilder-${VERSION}-${TARGET}-${SUBTARGET}.Linux-x86_64"
+          url="https://downloads.immortalwrt.org/releases/${VERSION}/targets/${TARGET}/${SUBTARGET}/${name}.tar.zst"
+          echo "Downloading $url"
+          curl -fsSL -o ib.tar.zst "$url"
+          tar --zstd -xf ib.tar.zst
+          mv "$name" ib
+          echo "IB=$PWD/ib" >> "$GITHUB_ENV"
+
+      - name: Register third-party feeds
+        run: |
+          set -euo pipefail
+          if [ -s config/repositories.extra ]; then
+            grep -vE '^\s*(#|$)' config/repositories.extra >> "$IB/repositories"
+          fi
+          cp -v keys/*.pem "$IB/keys/" 2>/dev/null || true
+          echo "--- repositories ---"
+          cat "$IB/repositories"
+          echo "--- keys ---"
+          ls -1 "$IB/keys"
+
+      - name: Build image
+        run: |
+          set -euo pipefail
+          packages="$(grep -vE '^\s*(#|$)' config/packages.txt | tr '\n' ' ')"
+          echo "PACKAGES=$packages"
+          files_arg=""
+          [ -d files ] && files_arg="FILES=$PWD/files"
+          # ImageBuilder only plumbs ROOTFS_PARTSIZE; the boot partition comes from the
+          # shipped .config, so KERNEL_PARTSIZE is verified afterwards rather than set here.
+          make -C "$IB" image \
+            PROFILE="$PROFILE" \
+            PACKAGES="$packages" \
+            ROOTFS_PARTSIZE="$ROOTFS_PARTSIZE" \
+            $files_arg
+
+      - name: Collect artifacts
+        id: collect
+        run: |
+          set -euo pipefail
+          out="$IB/bin/targets/${TARGET}/${SUBTARGET}"
+          ls -lh "$out"
+          img="$(ls "$out"/*squashfs-combined-efi.img.gz)"
+          echo "img=$img" >> "$GITHUB_OUTPUT"
+          echo "out=$out" >> "$GITHUB_OUTPUT"
+
+      - name: Verify partition layout matches the router
+        run: |
+          python3 scripts/check-partmap.py "${{ steps.collect.outputs.img }}" \
+            --kernel-mb "$KERNEL_PARTSIZE" --rootfs-mb "$ROOTFS_PARTSIZE"
+
+      - name: Summary
+        run: |
+          {
+            echo "## ImmortalWrt ${VERSION} for ${TARGET}/${SUBTARGET}"
+            echo
+            echo "Root partition: ${ROOTFS_PARTSIZE} MB, boot partition: ${KERNEL_PARTSIZE} MB"
+            echo
+            echo '```'
+            sha256sum "${{ steps.collect.outputs.img }}" | sed "s|$IB/||"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: immortalwrt-${{ env.VERSION }}-x86-64-rootfs${{ env.ROOTFS_PARTSIZE }}
+          path: |
+            ${{ steps.collect.outputs.out }}/*squashfs-combined-efi.img.gz
+            ${{ steps.collect.outputs.out }}/*.buildinfo
+            ${{ steps.collect.outputs.out }}/sha256sums
+          retention-days: 30
+          if-no-files-found: error

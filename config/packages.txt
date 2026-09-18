@@ -1,0 +1,54 @@
+# Packages baked into the image, one per line, comments allowed.
+# Generated from `owut list` on n5105 (2026-09-18).
+# A leading "-" removes a package that the profile installs by default.
+
+# base tooling
+cfdisk
+curl
+libcurl
+e2fsprogs
+ethtool
+git-http
+htop
+iperf3
+jq
+nano
+pciutils
+zsh
+atftpd
+bind-dig
+intel-microcode
+kmod-fs-ext4
+owut
+
+# firewall: the stock nftables is replaced by the json-capable build
+nftables-json
+-nftables
+
+# docker
+docker
+docker-compose
+dockerd
+
+# services
+adguardhome
+
+# nikki, from the third-party feed in config/repositories.extra
+luci-app-nikki
+luci-i18n-nikki-zh-cn
+
+# luci
+luci-app-adguardhome
+luci-app-attendedsysupgrade
+luci-app-dockerman
+luci-app-filemanager
+luci-app-ttyd
+luci-theme-argon
+luci-i18n-attendedsysupgrade-zh-cn
+luci-i18n-base-zh-cn
+luci-i18n-dockerman-zh-cn
+luci-i18n-filemanager-zh-cn
+luci-i18n-firewall-zh-cn
+luci-i18n-irqbalance-zh-cn
+luci-i18n-package-manager-zh-cn
+luci-i18n-ttyd-zh-cn

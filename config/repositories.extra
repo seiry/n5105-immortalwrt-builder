@@ -1,0 +1,3 @@
+# Extra apk feeds appended to the ImageBuilder's own repositories file.
+# Each feed needs its public key in keys/ (same basename, .pem).
+https://nikkinikki.pages.dev/openwrt-25.12/x86_64/nikki/packages.adb
